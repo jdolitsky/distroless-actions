@@ -33,7 +33,5 @@ runs:
     - |
       set -o errexit
 
-      /ko-app/apko build \
-        ${{ inputs.use-oci-mediatypes && '--use-oci-mediatypes' }} \
-        ${{ inputs.config }} ${{ inputs.tag }} output.tar
+      /ko-app/apko build ${{ inputs.use-oci-mediatypes && '--use-oci-mediatypes' }} ${{ inputs.config }} ${{ inputs.tag }} output.tar
       echo EXIT CODE: $?
