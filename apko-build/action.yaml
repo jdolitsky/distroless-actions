@@ -18,6 +18,12 @@ inputs:
       The tag to use for building the image.
     required: true
 
+  use-oci-mediatypes:
+    description: |
+      Use OCI standard mediatypes for building the image.
+    type: boolean
+    required: false
+
 runs:
   using: docker
   image: "docker://ghcr.io/chainguard-dev/apko:v0.3.3"
@@ -27,5 +33,7 @@ runs:
     - |
       set -o errexit
 
-      /ko-app/apko build ${{ inputs.config }} ${{ inputs.tag }} output.tar
+      /ko-app/apko build \
+        ${{ inputs.use-oci-mediatypes && '--use-oci-mediatypes' }} \
+        ${{ inputs.config }} ${{ inputs.tag }} output.tar
       echo EXIT CODE: $?
