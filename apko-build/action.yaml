@@ -26,7 +26,7 @@ inputs:
 
 runs:
   using: docker
-  image: "docker://ghcr.io/chainguard-dev/apko:v0.3.3"
+  image: "docker://ghcr.io/jdolitsky/apko:v9.9.9"
   entrypoint: /bin/sh
   args:
     - '-c'
