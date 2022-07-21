@@ -116,7 +116,7 @@ runs:
 
     # Only publish the versioned tag to start.  After we have signed and
     # attested things, then we use crane to update :latest below.
-    - uses: distroless/actions/apko-publish@main
+    - uses: jdolitsky/distroless-actions/apko-publish@automount-work-dir
       id: apko
       with:
         config: ${{ inputs.config }}
