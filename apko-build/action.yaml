@@ -59,7 +59,7 @@ inputs:
 
 runs:
   using: docker
-  image:  "docker://ghcr.io/chainguard-dev/apko:canary"
+  image:  "docker://ghcr.io/jdolitsky/apko:canary"
   entrypoint: /bin/sh
   args:
     - '-c'
