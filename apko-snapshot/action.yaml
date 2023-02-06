@@ -184,6 +184,14 @@ runs:
         username: ${{ inputs.username }}
         password: ${{ inputs.token }}
 
+    # Upload the SBOMs on disk as attestations
+    - shell: bash
+      env:
+        COSIGN_EXPERIMENTAL: "true"
+      run: |
+        ls -la
+        exit 1
+
     - shell: bash
       env:
         COSIGN_EXPERIMENTAL: "true"
