@@ -113,6 +113,33 @@ outputs:
   digest:
     description: |
       The digest of the published container image.
+  sbom-index-base64:
+    description: |
+      Base64-encoded SBOM (index).
+  sbom-amd64-base64:
+    description: |
+      Base64-encoded SBOM (amd64).
+  sbom-arm64-base64:
+    description: |
+      Base64-encoded SBOM (arm64).
+  sbom-386-base64:
+    description: |
+      Base64-encoded SBOM (386).
+  sbom-armv6-base64:
+    description: |
+      Base64-encoded SBOM (armv6).
+  sbom-armv7-base64:
+    description: |
+      Base64-encoded SBOM (armv7).
+  sbom-ppc64le-base64:
+    description: |
+      Base64-encoded SBOM (ppc64le).
+  sbom-riscv64-base64:
+    description: |
+      Base64-encoded SBOM (riscv64).
+  sbom-s390x-base64:
+    description: |
+      Base64-encoded SBOM (s390x).
 
 runs:
   using: docker
@@ -154,3 +181,6 @@ runs:
         --image-refs="${{ inputs.image_refs }}" --stage-tags="${{ inputs.stage_tags }}" ${{ inputs.config }} ${{ inputs.tag }} $keys $repos $archs $packageVersionTag $packageVersionTagPrefix $tagSuffix | tee ${DIGEST_FILE}
       echo EXIT CODE: $?
       echo ::set-output name=digest::$(cat ${DIGEST_FILE})
+
+      ls -la
+      exit 1
