@@ -181,6 +181,3 @@ runs:
         --image-refs="${{ inputs.image_refs }}" --stage-tags="${{ inputs.stage_tags }}" ${{ inputs.config }} ${{ inputs.tag }} $keys $repos $archs $packageVersionTag $packageVersionTagPrefix $tagSuffix | tee ${DIGEST_FILE}
       echo EXIT CODE: $?
       echo ::set-output name=digest::$(cat ${DIGEST_FILE})
-
-      ls -la
-      exit 1
