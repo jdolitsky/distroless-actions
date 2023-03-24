@@ -108,6 +108,13 @@ inputs:
     required: false
     default: false
 
+  slsa-attest:
+    description: |
+      Upload build provenance information as attestation.
+    type: boolean
+    required: false
+    default: false
+
   debug:
     description: |
       Enable debug logging.
@@ -149,6 +156,42 @@ outputs:
     value: ${{ steps.apko.outputs.digest }}
     description: |
       The digest of the published container image.
+  digest-index:
+    value: ${{ steps.extract.outputs.digest-index }}
+  digest-amd64:
+    value: ${{ steps.extract.outputs.digest-amd64 }}
+  digest-arm64:
+    value: ${{ steps.extract.outputs.digest-arm64 }}
+  digest-386:
+    value: ${{ steps.extract.outputs.digest-386 }}
+  digest-armv6:
+    value: ${{ steps.extract.outputs.digest-armv6 }}
+  digest-armv7:
+    value: ${{ steps.extract.outputs.digest-armv7 }}
+  digest-ppc64le:
+    value: ${{ steps.extract.outputs.digest-ppc64le }}
+  digest-riscv64:
+    value: ${{ steps.extract.outputs.digest-riscv64 }}
+  digest-s390x:
+    value: ${{ steps.extract.outputs.digest-s390x }}
+  shortdigest-index:
+    value: ${{ steps.extract.outputs.shortdigest-index }}
+  shortdigest-amd64:
+    value: ${{ steps.extract.outputs.shortdigest-amd64 }}
+  shortdigest-arm64:
+    value: ${{ steps.extract.outputs.shortdigest-arm64 }}
+  shortdigest-386:
+    value: ${{ steps.extract.outputs.shortdigest-386 }}
+  shortdigest-armv6:
+    value: ${{ steps.extract.outputs.shortdigest-armv6 }}
+  shortdigest-armv7:
+    value: ${{ steps.extract.outputs.shortdigest-armv7 }}
+  shortdigest-ppc64le:
+    value: ${{ steps.extract.outputs.shortdigest-ppc64le }}
+  shortdigest-riscv64:
+    value: ${{ steps.extract.outputs.shortdigest-riscv64 }}
+  shortdigest-s390x:
+    value: ${{ steps.extract.outputs.shortdigest-s390x }}
 
 runs:
   using: composite
@@ -215,6 +258,32 @@ runs:
             -a run_id=${{ github.run_id }} \
             -a run_attempt=${{ github.run_attempt }}
 
+    - name: Extract the digests for each architecture
+      id: extract
+      shell: bash
+      run: |
+        output="digest-index=${{ steps.apko.outputs.digest }}"
+        echo "Adding GitHub step output: ${output}"
+        echo "${output}" >> $GITHUB_OUTPUT
+        output="shortdigest-index=$(echo "${{ steps.apko.outputs.digest }}" | cut -d@ -f 2)"
+        echo "Adding GitHub step output: ${output}"
+        echo "${output}" >> $GITHUB_OUTPUT
+
+        # If its an index, extract the platform digests too
+        CRANE_MANIFEST_OUTPUT="$(crane manifest ${{ steps.apko.outputs.digest }})"
+        if [[ "$(echo $CRANE_MANIFEST_OUTPUT | jq -r .mediaType)" == "application/vnd.oci.image.index.v1+json" ]]; then
+          for combo in `echo $CRANE_MANIFEST_OUTPUT | jq -r '.manifests[] | .platform.architecture + .platform.variant + "_" + .digest'`; do
+            arch="$(echo "${combo}" | cut -d "_" -f1)"
+            digest="$(echo "${combo}" | cut -d "_" -f2)"
+            output="digest-${arch}=${{ inputs.apkoBaseTag }}@${digest}"
+            echo "Adding GitHub step output: ${output}"
+            echo "${output}" >> $GITHUB_OUTPUT
+            output="shortdigest-${arch}=${digest}"
+            echo "Adding GitHub step output: ${output}"
+            echo "${output}" >> $GITHUB_OUTPUT
+          done
+        fi
+
     - name: Upload SBOMs as attestations
       if: inputs.sbom-attest
       shell: bash
@@ -239,27 +308,82 @@ runs:
         }
 
         # First attest the index SBOM
-        attest_sbom "index" "${{ steps.apko.outputs.digest }}" "sbom-index.spdx.json"
+        attest_sbom "index" "${{ steps.extract.outputs.digest-index }}" "sbom-index.spdx.json"
 
-        # Then attest SBOMs for each individual architecture
-        for combo in `crane manifest ${{ steps.apko.outputs.digest }} | jq -r '.manifests[] | .platform.architecture + .platform.variant + "_" + .digest'`; do
-          arch="$(echo "${combo}" | cut -d "_" -f1)"
-          digest="$(echo "${combo}" | cut -d "_" -f2)"
+        # Next, for each architecture (if present)
+        [[ "${{ steps.extract.outputs.digest-amd64 }}" == "" ]] || attest_sbom "amd64" "${{ steps.extract.outputs.digest-amd64 }}" "sbom-x86_64.spdx.json"
+        [[ "${{ steps.extract.outputs.digest-arm64 }}" == "" ]] || attest_sbom "arm64" "${{ steps.extract.outputs.digest-arm64 }}" "sbom-aarch64.spdx.json"
+        [[ "${{ steps.extract.outputs.digest-386 }}" == "" ]] || attest_sbom "386" "${{ steps.extract.outputs.digest-386 }}" "sbom-x86.spdx.json"
+        [[ "${{ steps.extract.outputs.digest-armv6 }}" == "" ]] || attest_sbom "armv6" "${{ steps.extract.outputs.digest-armv6 }}" "sbom-armhf.spdx.json"
+        [[ "${{ steps.extract.outputs.digest-armv7 }}" == "" ]] || attest_sbom "armv7" "${{ steps.extract.outputs.digest-armv7 }}" "sbom-armv7.spdx.json"
+        [[ "${{ steps.extract.outputs.digest-ppc64le }}" == "" ]] || attest_sbom "ppc64le" "${{ steps.extract.outputs.digest-ppc64le }}" "sbom-ppc64le.spdx.json"
+        [[ "${{ steps.extract.outputs.digest-riscv64 }}" == "" ] || attest_sbom "riscv64" "${{ steps.extract.outputs.digest-riscv64 }}" "sbom-riscv64.spdx.json"
+        [[ "${{ steps.extract.outputs.digest-s390x }}" == "" ]] || attest_sbom "s390x" "${{ steps.extract.outputs.digest-s390x }}" "sbom-s390x.spdx.json"
 
-          # Convert the OCI arch types into APK arch types
-          sbomfile=""
-          [[ "${arch}" != "386" ]] || sbomfile="sbom-x86.spdx.json"
-          [[ "${arch}" != "amd64" ]] || sbomfile="sbom-x86_64.spdx.json"
-          [[ "${arch}" != "armv6" ]] || sbomfile="sbom-armhf.spdx.json"
-          [[ "${arch}" != "armv7" ]] || sbomfile="sbom-armv7.spdx.json"
-          [[ "${arch}" != "arm64" ]] || sbomfile="sbom-aarch64.spdx.json"
-          [[ "${arch}" != "ppc64le" ]] || sbomfile="sbom-ppc64le.spdx.json"
-          [[ "${arch}" != "riscv64" ]] || sbomfile="sbom-riscv64.spdx.json"
-          [[ "${arch}" != "s390x" ]] || sbomfile="sbom-s390x.spdx.json"
-
-          # Attest it
-          attest_sbom "${arch}" "${{ inputs.base-tag }}@${digest}" "${sbomfile}"
-        done
+    # See https://github.com/slsa-framework/slsa-github-generator/tree/main/internal/builders/container
+    - name: SLSA build provenance attestation (index)
+      if: ${{ inputs.slsa-attest }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-index }}
+        private-repository: true
+    - name: SLSA build provenance attestation (amd64)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-amd64 != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-amd64 }}
+        private-repository: true
+    - name: SLSA build provenance attestation (arm64)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-arm64 != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-arm64 }}
+        private-repository: true
+    - name: SLSA build provenance attestation (386)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-386 != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-386 }}
+        private-repository: true
+    - name: SLSA build provenance attestation (armv6)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-armv6 != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-armv6 }}
+        private-repository: true
+    - name: SLSA build provenance attestation (armv7)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-armv7 != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-armv7 }}
+        private-repository: true
+    - name: SLSA build provenance attestation (ppc64le)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-ppc64le != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-ppc64le }}
+        private-repository: true
+    - name: SLSA build provenance attestation (riscv64)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-riscv64 != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-riscv64 }}
+        private-repository: true
+    - name: SLSA build provenance attestation (s390x)
+      if: ${{ inputs.slsa-attest && steps.extract.outputs.shortdigest-s390x != '' }}
+      uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.5.0
+      with:
+        image: ${{ inputs.base-tag }}
+        digest: ${{ steps.extract.outputs.shortdigest-s390x }}
+        private-repository: true
 
     # Now that everything else has completed successfully, update the target tag.
     # based on the digest produced above.
